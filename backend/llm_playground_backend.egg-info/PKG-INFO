@@ -29,6 +29,11 @@ source .venv/bin/activate
 
 # Run the API
 uvicorn app.main:app --reload
+
+# Stop the API (choose either)
+pkill -f "uvicorn app.main:app"
+# or kill by port if needed
+kill "$(lsof -ti :8000)"
 ```
 
 The service starts on `http://localhost:8000`. The interactive docs are available at `/docs`.

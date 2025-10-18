@@ -25,6 +25,8 @@ Full-stack platform for rapid experimentation with hosted and local large langua
 cd backend
 uv sync             # install dependencies
 uv run uvicorn app.main:app --reload
+# stop the dev server from another terminal
+pkill -f "uvicorn app.main:app"
 ```
 
 The API listens on `http://localhost:8000` and exposes OpenAI-compatible chat endpoints plus provider/model management routes. Configure environment variables by copying `.env.example` to `.env` and setting `OPENROUTER_API_KEY` (and other options as needed).
