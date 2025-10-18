@@ -1,0 +1,567 @@
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  LayersIcon,
+  SearchIcon,
+  ChevronDownIcon,
+  CheckIcon,
+  CheckCircle2Icon,
+  CircleIcon,
+} from "lucide-react";
+import type { ModelInfo, ProviderInfo } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+interface ModelSwitcherProps {
+  models: ModelInfo[];
+  selectedModel?: string;
+  onModelChange: (modelId: string) => void;
+  provider?: ProviderInfo | null;
+  totalModels?: number;
+  showLoadedToggle?: boolean;
+  align?: "center" | "start";
+  variant?: "default" | "inline";
+}
+
+export function ModelSwitcher({
+  models,
+  selectedModel,
+  onModelChange,
+  provider,
+  totalModels,
+  showLoadedToggle = true,
+  align = "center",
+  variant = "default",
+}: ModelSwitcherProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [onlyLoaded, setOnlyLoaded] = useState(false);
+  const normalizedQuery = query.trim().toLowerCase();
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  const selectedModelMeta = useMemo(() => {
+    if (!selectedModel) return null;
+    return models.find((item) => item.id === selectedModel) ?? null;
+  }, [models, selectedModel]);
+
+  const totalCount = totalModels ?? models.length;
+  const loadedCount = useMemo(() => models.filter((model) => model.loaded).length, [models]);
+  const hasLoadedModels = loadedCount > 0;
+
+  const filteredModels = useMemo(() => {
+    const scoped = models.filter((model) => (onlyLoaded ? Boolean(model.loaded) : true));
+    if (!normalizedQuery) {
+      return ensureSelectedPresence(scoped, selectedModel, models);
+    }
+
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    const scored = scoped
+      .map((item) => ({
+        item,
+        score: computeMatchScore(item, tokens),
+      }))
+      .filter((entry) => entry.score !== Infinity)
+      .sort((a, b) => a.score - b.score)
+      .map((entry) => entry.item);
+
+    const ranked = scored.length ? scored : scoped;
+    return ensureSelectedPresence(ranked, selectedModel, models);
+  }, [models, normalizedQuery, onlyLoaded, selectedModel]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleClick = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      window.setTimeout(() => searchRef.current?.focus(), 0);
+    } else {
+      setQuery("");
+    }
+  }, [open]);
+
+  const providerLabel = provider?.name ?? provider?.id ?? "Provider";
+
+  const handleSelection = (modelId: string) => {
+    onModelChange(modelId);
+    setOpen(false);
+  };
+
+  const isInline = variant === "inline";
+  const alignmentClass = align === "center" ? "left-1/2 -translate-x-1/2" : "left-0";
+  const wrapperAlignment = align === "center" ? "items-center text-center" : "items-start text-left";
+  const subtitleAlignment = align === "center" ? "text-center" : "text-left";
+  const triggerWidthClass = align === "center" ? "w-full sm:w-auto sm:max-w-xl" : "w-full sm:w-auto";
+
+  const defaultModelLabel = models[0]?.name ?? models[0]?.id ?? "No models available";
+  const displayLabel =
+    selectedModelMeta?.name ??
+    selectedModelMeta?.id ??
+    (models.length === 0 ? "No models available" : defaultModelLabel);
+
+  const subtitle =
+    models.length === 0
+      ? "No models available yet"
+      : `${providerLabel} · ${onlyLoaded ? `${filteredModels.length}/${totalCount} loaded` : `${totalCount} models`}`;
+
+  const containerWidthClass = isInline
+    ? "w-auto"
+    : align === "center"
+      ? "w-full mx-auto max-w-2xl"
+      : "w-full sm:w-auto";
+
+  const inlineIconClass =
+    "flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-muted/60 text-muted-foreground transition group-hover:border-primary/40 group-hover:text-primary";
+
+  const inlineButtonClasses = cn(
+    "group flex min-w-[220px] items-center gap-3 rounded-xl border border-border/60 bg-background/80 px-4 py-2.5 text-left text-sm transition",
+    "hover:border-primary/40 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 supports-[backdrop-filter]:bg-background/60 supports-[backdrop-filter]:backdrop-blur-xl",
+  );
+
+  const defaultButtonClasses = cn(
+    "flex items-center gap-2 rounded-full border-border/70 bg-background px-4 py-2 text-sm font-medium",
+    "shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/40",
+    triggerWidthClass,
+  );
+
+  return (
+    <div ref={containerRef} className={cn("relative", containerWidthClass)}>
+      {isInline ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setOpen((prev) => !prev)}
+          disabled={models.length === 0}
+          className={inlineButtonClasses}
+        >
+          <span className={inlineIconClass}>
+            <LayersIcon className="h-4 w-4" />
+          </span>
+          <span className="flex min-w-[180px] flex-1 flex-col text-left">
+            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+              Model
+            </span>
+            <span className="truncate text-sm font-semibold text-foreground">
+              {selectedModelMeta?.name ?? selectedModelMeta?.id ?? defaultModelLabel}
+            </span>
+            <span className="mt-1 text-[11px] font-medium text-muted-foreground/70">
+              {selectedModelMeta
+                ? `${selectedModelMeta.loaded ? "Ready" : "Available"} · ${providerLabel}`
+                : `Connected to ${providerLabel}`}
+            </span>
+          </span>
+          <ChevronDownIcon
+            className={cn(
+              "ml-auto h-4 w-4 text-muted-foreground/70 transition group-hover:text-primary",
+              open ? "rotate-180 text-primary" : "",
+            )}
+          />
+        </Button>
+      ) : (
+        <div className={cn("flex flex-col gap-2", wrapperAlignment)}>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Active model
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen((prev) => !prev)}
+            disabled={models.length === 0}
+            className={defaultButtonClasses}
+          >
+            <span
+              className={cn(
+                "flex h-2.5 w-2.5 rounded-full",
+                selectedModelMeta?.loaded ? "bg-emerald-500" : "bg-muted-foreground/70",
+              )}
+            />
+            <span className="truncate font-mono">{displayLabel}</span>
+            <ChevronDownIcon
+              className={cn(
+                "h-4 w-4 transition",
+                open ? "rotate-180 text-primary" : "text-muted-foreground",
+              )}
+            />
+          </Button>
+          <p className={cn("text-xs text-muted-foreground", subtitleAlignment)}>{subtitle}</p>
+        </div>
+      )}
+
+      {open ? (
+        <div
+          className={cn(
+            "absolute z-50 mt-3 w-[min(100vw-2.5rem,520px)] rounded-xl border border-border/70 bg-background/95 shadow-2xl backdrop-blur",
+            alignmentClass,
+          )}
+        >
+          <div className="border-b border-border/60 bg-background/80 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={`Search ${providerLabel.toLowerCase()} models...`}
+                  className="h-10 w-full rounded-lg bg-background pl-9"
+                />
+              </div>
+              {showLoadedToggle && hasLoadedModels ? (
+                <Button
+                  type="button"
+                  variant={onlyLoaded ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setOnlyLoaded((prev) => !prev)}
+                  className={cn(
+                    "h-10 rounded-full px-4",
+                    onlyLoaded
+                      ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20"
+                      : "border-border/70 bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {onlyLoaded ? (
+                    <CheckCircle2Icon className="mr-2 h-4 w-4" />
+                  ) : (
+                    <CircleIcon className="mr-2 h-4 w-4" />
+                  )}
+                  Loaded
+                </Button>
+              ) : null}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {filteredModels.length} {filteredModels.length === 1 ? "match" : "matches"} ·{" "}
+              {onlyLoaded ? `${loadedCount} loaded` : `${totalCount} total`}
+            </p>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto py-2">
+            {filteredModels.length === 0 ? (
+              <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+                No models match your search. Try another keyword or clear the filters.
+              </div>
+            ) : (
+              filteredModels.map((item) => {
+                const isSelected = item.id === selectedModel;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleSelection(item.id)}
+                    className={cn(
+                      "flex w-full items-start gap-3 px-4 py-3 text-left transition",
+                      "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                      isSelected ? "bg-primary/10 text-primary" : "",
+                    )}
+                  >
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-foreground">
+                          {highlightMatches(item.name ?? item.id, normalizedQuery)}
+                        </span>
+                        {item.loaded ? (
+                          <Badge className="bg-emerald-500/15 text-[11px] font-semibold uppercase tracking-wide text-emerald-500">
+                            Loaded
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {item.name ? (
+                        <p className="truncate font-mono text-[12px] text-muted-foreground">
+                          {highlightMatches(item.id, normalizedQuery)}
+                        </p>
+                      ) : null}
+                      {item.description ? (
+                        <p className="truncate text-xs text-muted-foreground/90">
+                          {highlightMatches(item.description, normalizedQuery)}
+                        </p>
+                      ) : null}
+                      {item.tags?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {item.tags.slice(0, 3).map((tag) => (
+                            <Badge
+                              key={tag}
+                              variant="outline"
+                              className="rounded-md border-border/60 bg-background text-[11px] font-normal uppercase tracking-wide text-muted-foreground"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
+                          {item.tags.length > 3 ? (
+                            <Badge
+                              variant="outline"
+                              className="rounded-md border-border/60 bg-background text-[11px] font-normal uppercase tracking-wide text-muted-foreground"
+                            >
+                              +{item.tags.length - 3}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    <CheckIcon
+                      className={cn(
+                        "mt-1 h-4 w-4 transition-opacity",
+                        isSelected ? "opacity-100 text-primary" : "opacity-0 text-muted-foreground",
+                      )}
+                    />
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface ModelDetailsCardProps {
+  model?: ModelInfo | null;
+  provider?: ProviderInfo | null;
+  totalModels?: number;
+}
+
+export function ModelDetailsCard({ model, provider, totalModels }: ModelDetailsCardProps) {
+  const providerLabel = provider?.name ?? provider?.id ?? "Provider";
+  const total = totalModels ?? 0;
+  const [cardExpanded, setCardExpanded] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  useEffect(() => {
+    setCardExpanded(false);
+    setShowFullDescription(false);
+  }, [model?.id]);
+
+  return (
+    <div className="rounded-xl border border-dashed border-border/70 bg-muted/30 p-4 text-xs text-muted-foreground">
+      <button
+        type="button"
+        onClick={() =>
+          setCardExpanded((prev) => {
+            const next = !prev;
+            if (!next) {
+              setShowFullDescription(false);
+            }
+            return next;
+          })
+        }
+        className="flex w-full items-center justify-between gap-2 text-left text-sm font-semibold text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        aria-expanded={cardExpanded}
+      >
+        <span className="flex items-center gap-2">
+          <LayersIcon className="h-4 w-4" />
+          Model details
+        </span>
+        <ChevronDownIcon
+          className={cn("h-4 w-4 transition-transform", cardExpanded ? "rotate-180" : "")}
+          aria-hidden="true"
+        />
+      </button>
+      {cardExpanded ? (
+        model ? (
+          <div className="mt-3 space-y-3">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Identifier</p>
+              <p className="font-mono text-sm text-foreground">{model.id}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Provider
+                </p>
+                <p className="font-medium text-foreground">{providerLabel}</p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</p>
+                <p className="flex items-center gap-2 font-medium text-foreground">
+                  {model.loaded ? (
+                    <>
+                      <CheckCircle2Icon className="h-3.5 w-3.5 text-emerald-500" />
+                      Ready
+                    </>
+                  ) : (
+                    <>
+                      <CircleIcon className="h-3 w-3 text-muted-foreground" />
+                      Available
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            {model.description ? (
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  Description
+                </p>
+                <p
+                  className={cn(
+                    "text-foreground transition-all",
+                    showFullDescription ? "" : "line-clamp-3",
+                  )}
+                >
+                  {model.description}
+                </p>
+                {model.description && model.description.length > 160 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullDescription((prev) => !prev)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    {showFullDescription ? "Show less" : "Show more"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Tags</p>
+              {model.tags?.length ? (
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {model.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="rounded-md border-border/60 bg-background px-2 py-0 text-[11px] font-normal uppercase tracking-wide text-muted-foreground"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No tags provided.</p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span>
+                {model.loaded ? "Loaded and ready" : "Not loaded"} · {providerLabel}
+              </span>
+              {total ? <span>· {total} models available</span> : null}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Select a model above to inspect provider information, tags, and readiness state.
+          </p>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+function computeMatchScore(model: ModelInfo, tokens: string[]): number {
+  if (!tokens.length) return 0;
+
+  const haystack = `${model.id} ${model.name ?? ""} ${model.description ?? ""}`.toLowerCase();
+  const sanitizedHaystack = sanitize(haystack);
+  let score = 0;
+
+  for (const rawToken of tokens) {
+    const token = rawToken.toLowerCase();
+    const sanitizedToken = sanitize(token);
+    let tokenScore = Infinity;
+
+    const directIndex = haystack.indexOf(token);
+    if (directIndex !== -1) {
+      tokenScore = Math.min(tokenScore, directIndex);
+    }
+
+    const sanitizedIndex = sanitizedHaystack.indexOf(sanitizedToken);
+    if (sanitizedIndex !== -1) {
+      tokenScore = Math.min(tokenScore, sanitizedIndex + 25);
+    }
+
+    if (token.length >= 2) {
+      const fragments = haystack.split(/[^a-z0-9]+/);
+      for (const fragment of fragments) {
+        if (!fragment) continue;
+        const fragmentIndex = fragment.indexOf(token);
+        if (fragmentIndex !== -1) {
+          tokenScore = Math.min(tokenScore, fragmentIndex + 50);
+          break;
+        }
+      }
+    }
+
+    if (tokenScore === Infinity) {
+      return Infinity;
+    }
+
+    score += tokenScore;
+  }
+
+  return score;
+}
+
+function sanitize(value: string): string {
+  return value.replace(/[^a-z0-9]/gi, "");
+}
+
+function highlightMatches(text: string, normalizedQuery: string): ReactNode {
+  if (!normalizedQuery) return text;
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return text;
+
+  const escapedTokens = tokens.map(escapeRegExp);
+  const regex = new RegExp(`(${escapedTokens.join("|")})`, "gi");
+  const parts = text.split(regex);
+
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
+      <mark key={`${part}-${index}`} className="rounded-sm bg-primary/20 px-0.5 text-primary">
+        {part}
+      </mark>
+    ) : (
+      <span key={`${part}-${index}`}>{part}</span>
+    ),
+  );
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function ensureSelectedPresence(
+  list: ModelInfo[],
+  selectedId: string | undefined,
+  scoped: ModelInfo[],
+): ModelInfo[] {
+  if (!selectedId) return dedupeModels(list);
+  const hasSelected = list.some((item) => item.id === selectedId);
+  if (hasSelected) {
+    return dedupeModels(list);
+  }
+  const selected = scoped.find((item) => item.id === selectedId);
+  if (!selected) {
+    return dedupeModels(list);
+  }
+  return dedupeModels([selected, ...list]);
+}
+
+function dedupeModels(items: ModelInfo[]): ModelInfo[] {
+  const seen = new Set<string>();
+  const unique: ModelInfo[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    unique.push(item);
+  }
+  return unique;
+}

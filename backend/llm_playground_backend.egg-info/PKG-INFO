@@ -1,0 +1,64 @@
+Metadata-Version: 2.4
+Name: llm-playground-backend
+Version: 0.1.0
+Summary: FastAPI backend for the LLM Playground
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.110.0
+Requires-Dist: uvicorn[standard]>=0.27.0
+Requires-Dist: httpx>=0.26.0
+Requires-Dist: pydantic>=1.10.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: transformers>=4.36.0
+Requires-Dist: huggingface-hub>=0.20.2
+Requires-Dist: torch>=2.1.0; platform_system != "Darwin" or platform_machine == "arm64"
+Requires-Dist: pydantic-settings>=2.1.0
+
+# Backend (FastAPI)
+
+FastAPI application that exposes a unified API for both OpenRouter-hosted models and local HuggingFace inference. The project is configured for use with [`uv`](https://github.com/astral-sh/uv) to manage dependencies.
+
+## Getting started
+
+```bash
+# Install dependencies
+uv sync
+
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run the API
+uvicorn app.main:app --reload
+```
+
+The service starts on `http://localhost:8000`. The interactive docs are available at `/docs`.
+
+## Environment
+
+Copy `.env.example` from the repository root and set the following at minimum:
+
+```
+OPENROUTER_API_KEY=your-token
+FRONTEND_URL=http://localhost:5173
+DEFAULT_PROVIDER=openrouter
+```
+
+## Testing
+
+```bash
+uv run pytest
+```
+
+## Project layout
+
+```
+backend/
+├── app/
+│   ├── core/          # Config & dependency helpers
+│   ├── hooks/         # Interpretability hooks
+│   ├── models/        # Pydantic schemas
+│   ├── providers/     # Provider implementations
+│   ├── routers/       # FastAPI routers
+│   └── services/      # Business logic orchestration
+└── tests/             # Unit tests
+```
