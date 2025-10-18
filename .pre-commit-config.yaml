@@ -8,18 +8,19 @@ repos:
       - id: check-yaml
 
   # Python formatting and linting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: ^backend/
+        args: ["--profile=black"]
+
   - repo: https://github.com/psf/black
     rev: 23.12.1
     hooks:
       - id: black
         language_version: python3.12
         files: ^backend/
-
-  # - repo: https://github.com/PyCQA/isort
-  #   rev: 5.13.2
-  #   hooks:
-  #     - id: isort
-  #       files: ^backend/
 
   - repo: https://github.com/PyCQA/flake8
     rev: 6.1.0
