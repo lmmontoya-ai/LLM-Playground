@@ -24,6 +24,7 @@ Full-stack platform for rapid experimentation with hosted and local large langua
 ```bash
 cd backend
 uv sync             # install dependencies
+source .venv/bin/activate
 uv run uvicorn app.main:app --reload
 # stop the dev server from another terminal
 pkill -f "uvicorn app.main:app"
@@ -48,9 +49,3 @@ Use the right-hand navigation sidebar to switch between Online (OpenRouter) and 
 - **Provider abstraction** for OpenRouter-hosted models and local HuggingFace pipelines, including optional streaming support.
 - **Research-grade UI** featuring provider/model selectors, token streaming indicator, virtualised message list, markdown rendering, copy-to-clipboard, and persisted conversations.
 - **Configuration controls** for sampling parameters (temperature, top-p, penalties) accessible from the sidebar.
-
-## Next steps
-
-- Load or fine-tune HuggingFace models via `POST /api/models/load` before issuing local completions.
-- Re-introduce interpretability tooling once the new hook pipeline is ready.
-- Integrate auth, rate limiting, and persistence (e.g., database logging) as production requirements emerge.
