@@ -47,5 +47,4 @@ Use the right-hand navigation sidebar to switch between Online (OpenRouter) and 
 ## Key features
 
 - **Provider abstraction** for OpenRouter-hosted models and local HuggingFace pipelines, including optional streaming support.
-- **Research-grade UI** featuring provider/model selectors, token streaming indicator, virtualised message list, markdown rendering, copy-to-clipboard, and persisted conversations.
 - **Configuration controls** for sampling parameters (temperature, top-p, penalties) accessible from the sidebar.
